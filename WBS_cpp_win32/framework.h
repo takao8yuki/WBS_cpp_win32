@@ -8,6 +8,8 @@
 #define WIN32_LEAN_AND_MEAN             // Windows ヘッダーからほとんど使用されていない部分を除外する
 // Windows ヘッダー ファイル
 #include <windows.h>
+#include <commctrl.h>
+#pragma comment(lib, "comctl32.lib")
 // C ランタイム ヘッダー ファイル
 #include <stdlib.h>
 #include <malloc.h>

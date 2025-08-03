@@ -27,6 +27,9 @@
     <ClInclude Include="WBS_cpp_win32.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="WBSClasses.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="WBS_cpp_win32.cpp">
