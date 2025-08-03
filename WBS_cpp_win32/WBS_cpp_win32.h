@@ -1,6 +1,7 @@
 #pragma once
 
 #include "resource.h"
+#include "WBSClasses.h"  // WBSクラス定義をインクルード
 
 // ============================================================================
 // Common Controls マクロ定義

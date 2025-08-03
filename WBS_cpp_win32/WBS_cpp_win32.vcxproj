@@ -178,12 +178,10 @@
   <ItemGroup>
     <ClInclude Include="framework.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="ResponsiveLayout.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="WBSClasses.h" />
     <ClInclude Include="WBS_cpp_win32.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="WBS_cpp_win32.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="WBS_cpp_win32.rc" />
@@ -191,6 +189,9 @@
   <ItemGroup>
     <Image Include="small.ico" />
     <Image Include="WBS_cpp_win32.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="WBS_cpp_win32_main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
