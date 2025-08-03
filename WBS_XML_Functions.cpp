@@ -1,5 +1,5 @@
-// WBS XML ファイル操作機能
-// WBS_cpp_win32.cpp に追加する機能
+// WBS XML Processing Module - 修正版
+// XML処理専門モジュール（重複定義を削除）
 
 #include <fstream>
 #include <sstream>
@@ -7,29 +7,16 @@
 #include <locale>
 #include <windows.h>
 #include <commdlg.h>
+#include <shlobj.h>
+#include <memory>
+#include <vector>
+#include <string>
 
-// 前方宣言
-class WBSItem;
-class WBSProject;
+// 外部変数・関数の宣言（WBS_cpp_win32.cppで定義）
 extern std::unique_ptr<WBSProject> g_currentProject;
 extern void RefreshTreeView();
 extern void RefreshListView();
-
-// TaskStatus と TaskPriority の定義
-enum class TaskStatus {
-    NOT_STARTED = 0,    // 未開始
-    IN_PROGRESS = 1,    // 進行中
-    COMPLETED = 2,      // 完了
-    ON_HOLD = 3,        // 保留
-    CANCELLED = 4       // キャンセル
-};
-
-enum class TaskPriority {
-    LOW = 0,            // 低
-    MEDIUM = 1,         // 中
-    HIGH = 2,           // 高
-    URGENT = 3          // 緊急
-};
+extern void SaveLastOpenedFile(const std::wstring& filePath);
 
 // XMLエスケープ用のヘルパー関数
 std::wstring XmlEscape(const std::wstring& text) {
@@ -98,12 +85,7 @@ SYSTEMTIME StringToSystemTime(const std::wstring& str) {
     return st;
 }
 
-// XMLから値を抽出するヘルパー関数（オーバーロード版）
-std::wstring ExtractXmlValue(const std::wstring& xml, const std::wstring& tag) {
-    return ExtractXmlValue(xml, tag, 0);
-}
-
-// XMLから値を抽出するヘルパー関数（完全版）
+// XMLから値を抽出するヘルパー関数
 std::wstring ExtractXmlValue(const std::wstring& xml, const std::wstring& tag, size_t startPos) {
     std::wstring startTag = L"<" + tag + L">";
     std::wstring endTag = L"</" + tag + L">";
@@ -119,7 +101,7 @@ std::wstring ExtractXmlValue(const std::wstring& xml, const std::wstring& tag, s
 }
 
 // WBSアイテムをXMLに変換
-std::wstring WBSItemToXml(std::shared_ptr<WBSItem> item, int indent = 0) {
+std::wstring WBSItemToXml(std::shared_ptr<WBSItem> item, int indent) {
     if (!item) return L"";
     
     std::wstring indentStr(indent * 2, L' ');
@@ -178,42 +160,42 @@ std::shared_ptr<WBSItem> ParseTaskFromXml(const std::wstring& xml, size_t& pos) 
     pos = taskEnd + 7;
     
     auto item = std::make_shared<WBSItem>();
-    item->id = ExtractXmlValue(taskXml, L"ID");
-    item->taskName = ExtractXmlValue(taskXml, L"Name");
-    item->description = ExtractXmlValue(taskXml, L"Description");
-    item->assignedTo = ExtractXmlValue(taskXml, L"AssignedTo");
+    item->id = ExtractXmlValue(taskXml, L"ID", 0);
+    item->taskName = ExtractXmlValue(taskXml, L"Name", 0);
+    item->description = ExtractXmlValue(taskXml, L"Description", 0);
+    item->assignedTo = ExtractXmlValue(taskXml, L"AssignedTo", 0);
     
-    std::wstring statusStr = ExtractXmlValue(taskXml, L"Status");
+    std::wstring statusStr = ExtractXmlValue(taskXml, L"Status", 0);
     if (!statusStr.empty()) {
         item->status = (TaskStatus)std::stoi(statusStr);
     }
     
-    std::wstring priorityStr = ExtractXmlValue(taskXml, L"Priority");
+    std::wstring priorityStr = ExtractXmlValue(taskXml, L"Priority", 0);
     if (!priorityStr.empty()) {
         item->priority = (TaskPriority)std::stoi(priorityStr);
     }
     
-    std::wstring estimatedStr = ExtractXmlValue(taskXml, L"EstimatedHours");
+    std::wstring estimatedStr = ExtractXmlValue(taskXml, L"EstimatedHours", 0);
     if (!estimatedStr.empty()) {
         item->estimatedHours = std::stod(estimatedStr);
     }
     
-    std::wstring actualStr = ExtractXmlValue(taskXml, L"ActualHours");
+    std::wstring actualStr = ExtractXmlValue(taskXml, L"ActualHours", 0);
     if (!actualStr.empty()) {
         item->actualHours = std::stod(actualStr);
     }
     
-    std::wstring startDateStr = ExtractXmlValue(taskXml, L"StartDate");
+    std::wstring startDateStr = ExtractXmlValue(taskXml, L"StartDate", 0);
     if (!startDateStr.empty()) {
         item->startDate = StringToSystemTime(startDateStr);
     }
     
-    std::wstring endDateStr = ExtractXmlValue(taskXml, L"EndDate");
+    std::wstring endDateStr = ExtractXmlValue(taskXml, L"EndDate", 0);
     if (!endDateStr.empty()) {
         item->endDate = StringToSystemTime(endDateStr);
     }
     
-    std::wstring levelStr = ExtractXmlValue(taskXml, L"Level");
+    std::wstring levelStr = ExtractXmlValue(taskXml, L"Level", 0);
     if (!levelStr.empty()) {
         item->level = std::stoi(levelStr);
     }
@@ -235,6 +217,63 @@ std::shared_ptr<WBSItem> ParseTaskFromXml(const std::wstring& xml, size_t& pos) 
     }
     
     return item;
+}
+
+// ファイルからプロジェクトを読み込む関数
+bool LoadProjectFromFile(const std::wstring& filePath) {
+    try {
+        std::wifstream file(filePath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        file.imbue(std::locale(file.getloc(), new std::codecvt_utf8<wchar_t>));
+        std::wstring xmlContent((std::istreambuf_iterator<wchar_t>(file)),
+                              std::istreambuf_iterator<wchar_t>());
+        file.close();
+        
+        // プロジェクト名と説明を取得
+        std::wstring projectName = ExtractXmlValue(xmlContent, L"ProjectName", 0);
+        std::wstring description = ExtractXmlValue(xmlContent, L"Description", 0);
+        
+        if (projectName.empty()) {
+            projectName = L"読み込まれたプロジェクト";
+        }
+        
+        // 新しいプロジェクトを作成
+        g_currentProject = std::make_unique<WBSProject>(projectName);
+        g_currentProject->description = description;
+        
+        // ルートタスクを解析
+        size_t rootTaskStart = xmlContent.find(L"<RootTask>");
+        if (rootTaskStart != std::wstring::npos) {
+            size_t rootTaskEnd = xmlContent.find(L"</RootTask>");
+            if (rootTaskEnd != std::wstring::npos) {
+                std::wstring rootTaskXml = xmlContent.substr(rootTaskStart + 10, rootTaskEnd - rootTaskStart - 10);
+                size_t pos = 0;
+                auto loadedRootTask = ParseTaskFromXml(rootTaskXml, pos);
+                
+                if (loadedRootTask) {
+                    // ルートタスクの情報を設定
+                    loadedRootTask->taskName = projectName;
+                    g_currentProject->rootTask = loadedRootTask;
+                }
+            }
+        }
+        
+        RefreshTreeView();
+        RefreshListView();
+        
+        // 最後に開いたファイルパスを保存
+        SaveLastOpenedFile(filePath);
+        
+        MessageBox(nullptr, L"プロジェクトをXMLファイルから読み込みました。", L"情報", MB_OK | MB_ICONINFORMATION);
+        
+        return true;
+    } catch (...) {
+        MessageBox(nullptr, L"プロジェクトの読み込み中にエラーが発生しました。", L"エラー", MB_OK | MB_ICONERROR);
+        return false;
+    }
 }
 
 void OnSaveProject() {
@@ -261,9 +300,14 @@ void OnSaveProject() {
         try {
             std::wofstream file(szFile);
             if (file.is_open()) {
+                file.imbue(std::locale(file.getloc(), new std::codecvt_utf8<wchar_t>));
                 std::wstring xmlContent = ProjectToXml();
                 file << xmlContent;
                 file.close();
+                
+                // 最後に保存したファイルパスを記録
+                SaveLastOpenedFile(szFile);
+                
                 MessageBox(nullptr, L"プロジェクトをXMLファイルに保存しました。", L"情報", MB_OK | MB_ICONINFORMATION);
             } else {
                 MessageBox(nullptr, L"ファイルを開けませんでした。", L"エラー", MB_OK | MB_ICONERROR);
@@ -289,39 +333,6 @@ void OnOpenProject() {
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
     if (GetOpenFileName(&ofn) == TRUE) {
-        try {
-            std::wifstream file(szFile);
-            if (file.is_open()) {
-                std::wstring xmlContent((std::istreambuf_iterator<wchar_t>(file)),
-                                      std::istreambuf_iterator<wchar_t>());
-                file.close();
-                
-                // 新しいプロジェクトを作成
-                g_currentProject = std::make_unique<WBSProject>();
-                
-                // プロジェクト情報を解析
-                g_currentProject->projectName = ExtractXmlValue(xmlContent, L"ProjectName");
-                g_currentProject->description = ExtractXmlValue(xmlContent, L"Description");
-                
-                // ルートタスクを解析
-                size_t rootTaskStart = xmlContent.find(L"<RootTask>");
-                if (rootTaskStart != std::wstring::npos) {
-                    size_t rootTaskEnd = xmlContent.find(L"</RootTask>");
-                    if (rootTaskEnd != std::wstring::npos) {
-                        std::wstring rootTaskXml = xmlContent.substr(rootTaskStart + 10, rootTaskEnd - rootTaskStart - 10);
-                        size_t pos = 0;
-                        g_currentProject->rootTask = ParseTaskFromXml(rootTaskXml, pos);
-                    }
-                }
-                
-                RefreshTreeView();
-                RefreshListView();
-                MessageBox(nullptr, L"プロジェクトをXMLファイルから読み込みました。", L"情報", MB_OK | MB_ICONINFORMATION);
-            } else {
-                MessageBox(nullptr, L"ファイルを開けませんでした。", L"エラー", MB_OK | MB_ICONERROR);
-            }
-        } catch (...) {
-            MessageBox(nullptr, L"プロジェクトの読み込み中にエラーが発生しました。", L"エラー", MB_OK | MB_ICONERROR);
-        }
+        LoadProjectFromFile(szFile);
     }
 }
