@@ -74,6 +74,9 @@
 #include <vector>      // 動的配列（階層データ管理）
 #include <string>      // 文字列クラス（テキスト処理）
 
+std::wstring GetConfigFilePath();
+void SaveLastOpenedFile(const std::wstring& filePath);
+std::wstring GetLastOpenedFile();
 // ============================================================================
 // 外部依存関係 - メインアプリケーションとの連携
 // ============================================================================

@@ -3,181 +3,94 @@
  * WBS_cpp_win32.cpp - Work Breakdown Structure（作業分解構造）管理システム
  * ============================================================================
  * 
- * このファイルは、Windows Win32 APIを使用したWBSプロジェクト管理アプリケーション
- * のメイン実装ファイルです。TreeViewとListViewを使用した2ペイン構成のUIで、
- * 階層的なタスク管理機能を提供します。
+ * フォームデザインベースのWBSプロジェクト管理アプリケーション
+ * Visual Studioのリソースエディタで設計されたダイアログを使用
  * 
- * 【主な機能】
- * - プロジェクトの階層的タスク管理
- * - XML形式でのプロジェクトデータ保存・読み込み
- * - タスクの詳細情報表示・編集
- * - ツリー表示の展開・折りたたみ操作
- * - 最後に開いたファイルの自動復元機能
- * 
- * 【アーキテクチャ概要】
- * - 言語: C++14準拠
- * - GUI: Win32 API + Common Controls 6.0
- * - データ永続化: XML形式
- * - 文字エンコーディング: Unicode (UTF-16LE)
- * - メモリ管理: RAII + std::shared_ptr/std::unique_ptr
+ * 【変更点】
+ * - CreateWindowからDialogBoxに変更
+ * - フォームデザイナーで設計されたレイアウトを使用
+ * - ボタンクリックイベントをダイアログプロシージャで処理
  * 
  * 【UI構成】
- * - 左ペイン: TreeView（階層構造でタスクを表示）
- * - 右ペイン: ListView（選択されたタスクの詳細情報を表示）
- * - メニューバー: ファイル、編集、表示、ヘルプの各操作
- * 
- * 【設計パターン】
- * - MVC的構造（Model: WBSクラス, View: UI Controls, Controller: Event Handlers）
- * - Observer パターン（UI更新通知）
- * - Command パターン（メニュー操作）
- * 
- * 作成者: 開発チーム
- * 作成日: 2024年
- * 最終更新: 2024年
- * バージョン: 1.0
+ * - IDD_WBS_MAIN: メインフォーム（800x600ピクセル）
+ * - IDD_TASK_EDIT: タスク編集ダイアログ
+ * - Visual Studioリソースエディタで視覚的に設計可能
  * ============================================================================
  */
-
-// WBS_cpp_win32.cpp : アプリケーションのエントリ ポイントを定義します。
-//
 
 #include "framework.h"
 #include "WBS_cpp_win32.h"
 #include <vector>
 #include <string>
 #include <memory>
-#include <commctrl.h>  // TreeView, ListView用
-#include <commdlg.h>   // ファイルダイアログ用
-#include <fstream>     // ファイルI/O用
-#include <sstream>     // 文字列ストリーム用
-#include <codecvt>     // 文字コード変換用
-#include <locale>      // ロケール設定用
-#include <Windows.h>   // Windows基本API
-#include <shlobj.h>    // シェル操作API（フォルダパス取得）
+#include <commctrl.h>
+#include <commdlg.h>
+#include <fstream>
+#include <sstream>
+#include <codecvt>
+#include <locale>
+#include <Windows.h>
+#include <shlobj.h>
+#include <windowsx.h>  // ComboBoxマクロの定義を確実にインクルード
 
-#pragma comment(lib, "comctl32.lib")  // Common Controls
-#pragma comment(lib, "shell32.lib")   // Shell API
-
-// Windowsサブシステムを指定（コンソールウィンドウを表示しない）
+#pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "shell32.lib")
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS")
 
-// ============================================================================
-// 定数定義
-// ============================================================================
-#define MAX_LOADSTRING 100  // 文字列リソースの最大長
+// ComboBoxマクロが定義されていない場合の代替定義
+#ifndef ComboBox_AddString
+#define ComboBox_AddString(hwndCtl, lpsz) ((int)(DWORD)SendMessage((hwndCtl), CB_ADDSTRING, 0L, (LPARAM)(LPCTSTR)(lpsz)))
+#endif
+
+#ifndef ComboBox_SetCurSel
+#define ComboBox_SetCurSel(hwndCtl, index) ((int)(DWORD)SendMessage((hwndCtl), CB_SETCURSEL, (WPARAM)(int)(index), 0L))
+#endif
+
+#ifndef ComboBox_GetCurSel
+#define ComboBox_GetCurSel(hwndCtl) ((int)(DWORD)SendMessage((hwndCtl), CB_GETCURSEL, 0L, 0L))
+#endif
+
+#define MAX_LOADSTRING 100
 
 // ============================================================================
-// 列挙型定義 - タスク管理で使用する状態と優先度
+// 列挙型定義
 // ============================================================================
 
-/**
- * @brief WBSタスクの進行状態を表す列挙型
- * 
- * プロジェクト管理において、各タスクの現在の状況を明確に分類するために使用します。
- * 進捗レポートの生成や、プロジェクト全体の状況把握に活用されます。
- * 
- * @note 状態遷移の推奨パターン:
- *       NOT_STARTED → IN_PROGRESS → COMPLETED
- *       例外的に ON_HOLD や CANCELLED への変更も可能
- */
 enum class TaskStatus {
-    NOT_STARTED = 0,    // 未開始 - タスクがまだ開始されていない状態
-    IN_PROGRESS = 1,    // 進行中 - タスクが現在実行されている状態  
-    COMPLETED = 2,      // 完了 - タスクが正常に完了した状態
-    ON_HOLD = 3,        // 保留 - 一時的に作業が停止されている状態
-    CANCELLED = 4       // キャンセル - タスクが中止された状態
+    NOT_STARTED = 0,
+    IN_PROGRESS = 1,
+    COMPLETED = 2,
+    ON_HOLD = 3,
+    CANCELLED = 4
 };
 
-/**
- * @brief WBSタスクの重要度・緊急度を表す列挙型
- * 
- * リソース配分や作業順序の決定、スケジュール調整において
- * タスクの優先順位を判断するために使用します。
- * 
- * @note 優先度の判断基準:
- *       URGENT: 即座に対応が必要（期限切れリスク高)
- *       HIGH: 重要で早めの完了が必要（プロジェクト成功に直結）
- *       MEDIUM: 標準的な優先度（通常の作業順序で処理)
- *       LOW: 時間に余裕がある場合に実行（先送り可能)
- */
 enum class TaskPriority {
-    LOW = 0,            // 低優先度 - 時間に余裕がある場合に実行
-    MEDIUM = 1,         // 中優先度 - 標準的な優先度レベル
-    HIGH = 2,           // 高優先度 - 重要で早めの完了が必要
-    URGENT = 3          // 緊急 - 最優先で即座に対応が必要
+    LOW = 0,
+    MEDIUM = 1,
+    HIGH = 2,
+    URGENT = 3
 };
 
 // ============================================================================
-// クラス定義 - WBSタスク管理の中核となるクラス群
+// クラス定義（既存のWBSItemとWBSProjectクラス）
 // ============================================================================
 
-/**
- * @brief WBS（Work Breakdown Structure）の個別作業項目を表すクラス
- * 
- * プロジェクトを構成する個々のタスクやサブタスクを表現し、階層構造を形成します。
- * shared_from_thisを継承することで、安全な自己参照機能を提供し、
- * 親子関係の管理における循環参照を防ぎます。
- * 
- * @details 設計思想:
- * - RAII原則: コンストラクタでの完全初期化、デストラクタでの自動クリーンアップ
- * - const-correctness: 読み取り専用操作を明確に区別
- * - 強い型安全性: 列挙型による状態・優先度の型安全な管理
- * - メモリ安全性: shared_ptr/weak_ptrによる自動メモリ管理
- * 
- * @warning 重要な注意事項:
- * - 必ずstd::make_sharedで作成すること（shared_from_thisのため)
- * - 親子関係の設定はAddChildメソッドを使用すること
- * - 循環参照を避けるため、親への強参照は禁止
- * 
- * @example 基本的な使用パターン:
- * @code
- * // タスクの作成
- * auto mainTask = std::make_shared<WBSItem>("システム開発");
- * mainTask->SetDescription("新システムの設計・開発・テスト");
- * mainTask->SetEstimatedHours(200.0);
- * mainTask->SetPriority(TaskPriority::HIGH);
- * 
- * // サブタスクの追加
- * auto designTask = std::make_shared<WBSItem>("設計フェーズ");
- * mainTask->AddChild(designTask);
- * 
- * // 進捗の更新
- * designTask->SetActualHours(25.0);
- * designTask->SetStatus(TaskStatus::IN_PROGRESS);
- * @endcode
- */
 class WBSItem : public std::enable_shared_from_this<WBSItem> {
 public:
-    // メンバ変数（publicアクセス - 簡易的な実装のため）
-    std::wstring id;                                        ///< タスクの一意識別子（階層的なID体系)
-    std::wstring taskName;                                  ///< タスクの名称
-    std::wstring description;                               ///< タスクの詳細説明
-    std::wstring assignedTo;                                ///< 担当者名
-    TaskStatus status;                                      ///< 現在の進行状態
-    TaskPriority priority;                                  ///< 優先度レベル
-    double estimatedHours;                                  ///< 見積もり工数（時間単位)
-    double actualHours;                                     ///< 実績工数（時間単位)
-    SYSTEMTIME startDate;                                   ///< 開始予定日
-    SYSTEMTIME endDate;                                     ///< 終了予定日
-    int level;                                              ///< 階層レベル（0=ルート)
-    std::vector<std::shared_ptr<WBSItem>> children;         ///< 子タスクのコレクション
-    std::weak_ptr<WBSItem> parent;                          ///< 親タスクへの弱参照（循環参照回避）
+    std::wstring id;
+    std::wstring taskName;
+    std::wstring description;
+    std::wstring assignedTo;
+    TaskStatus status;
+    TaskPriority priority;
+    double estimatedHours;
+    double actualHours;
+    SYSTEMTIME startDate;
+    SYSTEMTIME endDate;
+    int level;
+    std::vector<std::shared_ptr<WBSItem>> children;
+    std::weak_ptr<WBSItem> parent;
 
-    /**
-     * @brief デフォルトコンストラクタ
-     * 
-     * 新しいWBSアイテムを安全な初期状態で作成します。
-     * 全てのメンバ変数が適切なデフォルト値で初期化され、
-     * 即座に使用可能な状態になります。
-     * 
-     * @post 以下の状態で初期化される:
-     *       - status: NOT_STARTED
-     *       - priority: MEDIUM
-     *       - estimatedHours/actualHours: 0.0
-     *       - level: 0
-     *       - startDate/endDate: 現在のシステム時刻
-     *       - taskName: "新しいタスク"
-     */
     WBSItem() : status(TaskStatus::NOT_STARTED), priority(TaskPriority::MEDIUM), 
                 estimatedHours(0.0), actualHours(0.0), level(0) {
         GetSystemTime(&startDate);
@@ -185,42 +98,10 @@ public:
         taskName = L"新しいタスク";
     }
 
-    /**
-     * @brief 名前指定コンストラクタ
-     * 
-     * @param name タスク名
-     * 
-     * 指定された名前でWBSアイテムを作成します。
-     * デフォルトコンストラクタを委譲呼び出しして基本初期化を行い、
-     * その後でタスク名を設定します。
-     * 
-     * @param name 設定するタスク名（空文字列も許可）
-     * 
-     * @post デフォルト初期化 + taskName = nameの状態
-     */
     WBSItem(const std::wstring& name) : WBSItem() {
         taskName = name;
     }
 
-    /**
-     * @brief 子タスクを階層構造に追加
-     * 
-     * @param child 追加する子タスク
-     * 
-     * 指定されたタスクを子タスクとして追加し、適切な階層関係を構築します。
-     * 子タスクの親参照、階層レベル、IDが自動的に設定されます。
-     * 
-     * @pre child != nullptr
-     * @pre child が既に他の親を持っていないこと
-     * 
-     * @post 以下の状態変更が行われる:
-     *       - child->parent = this（弱参照）
-     *       - child->level = this->level + 1
-     *       - child->id = this->id + "." + (子タスク番号)
-     *       - this->children に child が追加される
-     * 
-     * @note IDの自動生成例: 親ID"1.2" + 3番目の子 → "1.2.3"
-     */
     void AddChild(std::shared_ptr<WBSItem> child) {
         child->parent = shared_from_this();
         child->level = this->level + 1;
@@ -228,22 +109,6 @@ public:
         children.push_back(child);
     }
 
-    /**
-     * @brief タスクの状態を日本語文字列で取得
-     * 
-     * @return 状態の日本語表記
-     * 
-     * TaskStatus列挙値を、ユーザーフレンドリーな日本語文字列に変換します。
-     * UI表示やレポート生成において使用されます。
-     * 
-     * @note 戻り値の対応表:
-     *       NOT_STARTED → "未開始"
-     *       IN_PROGRESS → "進行中"  
-     *       COMPLETED → "完了"
-     *       ON_HOLD → "保留"
-     *       CANCELLED → "キャンセル"
-     *       その他 → "未開始"（フォールバック）
-     */
     std::wstring GetStatusString() const {
         switch (status) {
             case TaskStatus::NOT_STARTED: return L"未開始";
@@ -255,14 +120,6 @@ public:
         }
     }
 
-    /**
-     * @brief タスクの優先度を日本語文字列で取得
-     * 
-     * @return 優先度の日本語表記
-     * 
-     * TaskPriority列挙値を、視覚的に分かりやすい日本語文字列に変換します。
-     * タスク一覧の表示や、優先度によるソート表示で使用されます。
-     */
     std::wstring GetPriorityString() const {
         switch (priority) {
             case TaskPriority::LOW: return L"低";
@@ -273,69 +130,18 @@ public:
         }
     }
 
-    /**
-     * @brief タスクの進捗率を計算
-     * 
-     * @return 進捗率（0.0〜100.0の範囲）
-     * 
-     * 実績工数を見積もり工数で除算して進捗率を算出します。
-     * プロジェクト管理ダッシュボードやガントチャートでの
-     * 視覚的な進捗表示に使用されます。
-     * 
-     * @note 計算仕様:
-     *       - estimatedHours == 0.0 の場合: 0.0を返す（ゼロ除算回避）
-     *       - 100.0を超える値も許可（工数超過の可視化）
-     *       - 負の値は発生しない（actualHours >= 0.0 を前提）
-     * 
-     * @warning 進捗率 > 100% の場合は工数見積もりの見直しが必要
-     */
     double GetProgressPercentage() const {
         if (estimatedHours == 0.0) return 0.0;
         return (actualHours / estimatedHours) * 100.0;
     }
 };
 
-/**
- * @brief WBSプロジェクト全体を統括管理するクラス
- * 
- * プロジェクトレベルでのメタデータを管理し、ルートタスクを通じて
- * 全ての階層タスクへの一元的なアクセスポイントを提供します。
- * XML形式でのデータ永続化機能も包含しています。
- * 
- * @details 責務:
- * - プロジェクト基本情報の管理（名前、説明、作成日など)
- * - ルートタスクを起点とした全タスクツリーの管理
- * - プロジェクト全体の統計情報計算
- * - ファイルI/Oを通じたデータ永続化
- * 
- * @example プロジェクトの基本的な操作:
- * @code
- * // プロジェクトの作成と初期設定
- * auto project = std::make_unique<WBSProject>("ECサイト構築");
- * project->description = "新規ECサイトの企画・設計・開発・運用開始まで";
- * 
- * // メインフェーズの追加
- * auto planningPhase = std::make_shared<WBSItem>("企画フェーズ");
- * project->rootTask->AddChild(planningPhase);
- * @endcode
- */
 class WBSProject {
 public:
-    std::wstring projectName;                               ///< プロジェクトの正式名称
-    std::wstring description;                               ///< プロジェクトの概要説明
-    std::shared_ptr<WBSItem> rootTask;                      ///< 全タスクの最上位ノード
+    std::wstring projectName;
+    std::wstring description;
+    std::shared_ptr<WBSItem> rootTask;
 
-    /**
-     * @brief デフォルトコンストラクタ
-     * 
-     * 標準的なプロジェクト名でWBSプロジェクトを初期化します。
-     * ルートタスクが自動作成され、即座に使用可能な状態になります。
-     * 
-     * @post 以下の状態で初期化:
-     *       - projectName: "新規WBSプロジェクト"
-     *       - rootTask: 自動作成（ID="1", level=0）
-     *       - description: 空文字列
-     */
     WBSProject() {
         projectName = L"新規WBSプロジェクト";
         rootTask = std::make_shared<WBSItem>(projectName);
@@ -343,15 +149,6 @@ public:
         rootTask->level = 0;
     }
 
-    /**
-     * @brief 名前指定コンストラクタ
-     * 
-     * @param name プロジェクト名
-     * 
-     * 指定された名前でWBSプロジェクトを作成します。
-     * デフォルトコンストラクタを委譲して基本初期化を行い、
-     * その後でプロジェクト名とルートタスク名を同期設定します。
-     */
     WBSProject(const std::wstring& name) : WBSProject() {
         projectName = name;
         rootTask->taskName = name;
@@ -359,122 +156,41 @@ public:
 };
 
 // ============================================================================
-// グローバル変数定義 - アプリケーション全体で共有される状態
+// グローバル変数
 // ============================================================================
 
-// Windows APIアプリケーション標準のグローバル変数
-HINSTANCE hInst;                                // 現在のアプリケーションインスタンス
-WCHAR szTitle[MAX_LOADSTRING];                  // ウィンドウタイトルバーのテキスト
-WCHAR szWindowClass[MAX_LOADSTRING];            // メインウィンドウクラス名
-
-// WBS アプリケーション固有のグローバル変数
-std::unique_ptr<WBSProject> g_currentProject;   // 現在開いているプロジェクト
-HWND g_hTreeWBS = nullptr;                      // 左ペインのTreeViewコントロール
-HWND g_hListDetails = nullptr;                  // 右ペインのListViewコントロール  
-HTREEITEM g_selectedItem = nullptr;             // TreeViewで現在選択されているアイテム
+HINSTANCE hInst;
+std::unique_ptr<WBSProject> g_currentProject;
+HWND g_hMainDialog = nullptr;           // メインダイアログハンドル
+HWND g_hTreeWBS = nullptr;
+HWND g_hListDetails = nullptr;
+HTREEITEM g_selectedItem = nullptr;
 
 // ============================================================================
-// リソースID定義 - メニューとコントロールの識別子
+// 関数の前方宣言
 // ============================================================================
 
-// ファイル操作メニューのコマンドID（110番台）
-#define IDM_FILE_NEW        110                 // 新規プロジェクト作成
-#define IDM_FILE_OPEN       111                 // プロジェクトファイルを開く
-#define IDM_FILE_SAVE       112                 // プロジェクトファイルを保存
+INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK TaskEditDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
-// 編集操作メニューのコマンドID（120番台）
-#define IDM_EDIT_ADD_TASK   120                 // ルートレベルにタスクを追加
-#define IDM_EDIT_ADD_SUBTASK 121                // 選択タスクにサブタスクを追加
-#define IDM_EDIT_EDIT_TASK  122                 // 選択タスクの詳細編集
-#define IDM_EDIT_DELETE_TASK 123                // 選択タスクの削除
+void InitializeWBSDialog(HWND hDlg);
+void RefreshTreeView();
+void RefreshListView();
+void OnTreeSelectionChanged();
+HTREEITEM AddTreeItem(HTREEITEM hParent, std::shared_ptr<WBSItem> item);
+void AddTreeItemRecursive(HTREEITEM hParent, std::shared_ptr<WBSItem> item);
+std::shared_ptr<WBSItem> GetItemFromTreeItem(HTREEITEM hItem);
 
-// 表示操作メニューのコマンドID（130番台）
-#define IDM_VIEW_EXPAND_ALL 130                 // 全てのツリーノードを展開
-#define IDM_VIEW_COLLAPSE_ALL 131               // 全てのツリーノードを折りたたみ
-
-// UIコントロールのID（1000番台）
-#define IDC_TREE_WBS        1000                // 左ペインのTreeViewコントロール
-#define IDC_LIST_DETAILS    1001                // 右ペインのListViewコントロール
-
-// ============================================================================
-// 関数の前方宣言 - Windows標準とWBS固有の関数群
-// ============================================================================
-
-// Windows APIアプリケーション標準の関数
-ATOM                MyRegisterClass(HINSTANCE hInstance);
-BOOL                InitInstance(HINSTANCE, int);
-LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
-
-// WBS アプリケーション固有の関数群
-
-// === 初期化・UI作成関連 ===
-void InitializeWBS(HWND hWnd);                              // WBSシステム全体の初期化
-void CreateWBSControls(HWND hWnd);                          // TreeView/ListView の作成と設定
-
-// === UI更新・表示関連 ===  
-void RefreshTreeView();                                     // TreeView の内容を完全再構築
-void RefreshListView();                                     // ListView の詳細表示を更新
-HTREEITEM AddTreeItem(HTREEITEM hParent, std::shared_ptr<WBSItem> item);  // TreeView に単一アイテム追加
-void AddTreeItemRecursive(HTREEITEM hParent, std::shared_ptr<WBSItem> item); // TreeView に階層アイテム追加
-
-// === データ操作・変換関連 ===
-std::shared_ptr<WBSItem> GetItemFromTreeItem(HTREEITEM hItem);  // TreeViewアイテムからWBSItem取得
-
-// === イベントハンドラ関連 ===
-void OnTreeSelectionChanged();                             // TreeView選択変更時の処理
-void OnAddTask();                                          // タスク追加コマンドの処理
-void OnAddSubTask();                                       // サブタスク追加コマンドの処理
-void OnEditTask();                                         // タスク編集コマンドの処理
-void OnDeleteTask();                                       // タスク削除コマンドの処理
-
-// === ツリー操作関連 ===
-void ExpandAllTreeItems(HTREEITEM hItem);                  // 指定ノード以下を全展開
-void CollapseAllTreeItems(HTREEITEM hItem);                // 指定ノード以下を全折りたたみ
-
-// === 設定ファイル関連 ===
-void SaveLastOpenedFile(const std::wstring& filePath);     // 最後に開いたファイルパスを保存
-std::wstring GetLastOpenedFile();                          // 最後に開いたファイルパスを取得
-
-// === XML操作関連（実装は WBS_XML_Functions.cpp にあり）===
-extern std::wstring XmlEscape(const std::wstring& text);
-extern std::wstring XmlUnescape(const std::wstring& text);
-extern std::wstring SystemTimeToString(const SYSTEMTIME& st);
-extern SYSTEMTIME StringToSystemTime(const std::wstring& str);
-extern std::wstring WBSItemToXml(std::shared_ptr<WBSItem> item, int indent);
-extern std::wstring ProjectToXml();
-extern std::shared_ptr<WBSItem> ParseTaskFromXml(const std::wstring& xml, size_t& pos);
-extern std::wstring ExtractXmlValue(const std::wstring& xml, const std::wstring& tag, size_t startPos);
-
-// === ファイル操作関連（実装は WBS_XML_Functions.cpp にあり）===
+// 外部XML関数
 extern void OnSaveProject();
 extern void OnOpenProject();
 extern bool LoadProjectFromFile(const std::wstring& filePath);
 
 // ============================================================================
-// アプリケーションエントリポイント
+// メインエントリポイント - ダイアログベースアプリケーション
 // ============================================================================
 
-/**
- * @brief Windowsアプリケーションのメインエントリポイント
- * 
- * @param hInstance 現在のアプリケーションインスタンス
- * @param hPrevInstance 前のインスタンス（Win32では常にNULL）
- * @param lpCmdLine コマンドライン引数
- * @param nCmdShow ウィンドウ表示方法の指定
- * @return アプリケーション終了コード
- * 
- * Windowsアプリケーションの標準的な初期化シーケンスを実行し、
- * メッセージループを開始します。WBS固有の初期化も含まれます。
- * 
- * @details 実行フロー:
- * 1. コマンドライン引数の処理（現在は使用しない）
- * 2. Common Controls の初期化（TreeView/ListView使用のため）
- * 3. ウィンドウクラスの登録
- * 4. メインウィンドウの作成と表示
- * 5. アクセラレータテーブルの読み込み
- * 6. メッセージループの開始
- */
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPWSTR    lpCmdLine,
@@ -482,155 +198,153 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
+    UNREFERENCED_PARAMETER(nCmdShow);
 
-    // Common Controls の初期化（TreeView/ListView 使用のため必須）
+    hInst = hInstance;
+
+    // Common Controls の初期化
     INITCOMMONCONTROLSEX icex;
     icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
-    icex.dwICC = ICC_TREEVIEW_CLASSES | ICC_LISTVIEW_CLASSES;
+    icex.dwICC = ICC_TREEVIEW_CLASSES | ICC_LISTVIEW_CLASSES | ICC_DATE_CLASSES | ICC_PROGRESS_CLASS;
     InitCommonControlsEx(&icex);
 
-    // リソースからグローバル文字列を読み込み
-    LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_WBSCPPWIN32, szWindowClass, MAX_LOADSTRING);
-    MyRegisterClass(hInstance);
+    // メインダイアログを表示
+    DialogBox(hInstance, MAKEINTRESOURCE(IDD_WBS_MAIN), nullptr, MainDlgProc);
 
-    // アプリケーション初期化の実行
-    if (!InitInstance (hInstance, nCmdShow))
-    {
-        return FALSE;
-    }
-
-    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WBSCPPWIN32));
-
-    MSG msg;
-
-    // メインメッセージループ: ウィンドウが閉じられるまで継続
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-    }
-
-    return (int) msg.wParam;
+    return 0;
 }
 
-//
-//  関数: MyRegisterClass()
-//
-//  目的: ウィンドウ クラスを登録します。
-//
-ATOM MyRegisterClass(HINSTANCE hInstance)
-{
-    WNDCLASSEXW wcex;
+// ============================================================================
+// メインダイアログプロシージャ
+// ============================================================================
 
-    wcex.cbSize = sizeof(WNDCLASSEX);
-
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_WBSCPPWIN32));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_WBSCPPWIN32);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
-
-    return RegisterClassExW(&wcex);
-}
-
-//
-//   関数: InitInstance(HINSTANCE, int)
-//
-//   目的: インスタンス ハンドルを保存して、メイン ウィンドウを作成します
-//
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
-   hInst = hInstance; // グローバル変数にインスタンス ハンドルを格納する
-
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
-
-   if (!hWnd)
-   {
-      return FALSE;
-   }
-
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
-
-   // WBSを初期化
-   InitializeWBS(hWnd);
-
-   return TRUE;
-}
-
-//
-//  関数: WndProc(HWND, UINT, WPARAM, LPARAM)
-//
-//  目的: メイン ウィンドウのメッセージ を処理します。
-//
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
-    case WM_CREATE:
-        CreateWBSControls(hWnd);
-        break;
+    case WM_INITDIALOG:
+        {
+            g_hMainDialog = hDlg;
+            
+            // コントロールハンドルを取得
+            g_hTreeWBS = GetDlgItem(hDlg, IDC_TREE_WBS);
+            g_hListDetails = GetDlgItem(hDlg, IDC_LIST_DETAILS);
+            
+            // WBSシステムを初期化
+            InitializeWBSDialog(hDlg);
+            
+            return (INT_PTR)TRUE;
+        }
+
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
-            // 選択されたメニューの解析:
             switch (wmId)
             {
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
+            case IDC_BUTTON_NEW_PROJECT:
             case IDM_FILE_NEW:
                 g_currentProject = std::make_unique<WBSProject>();
                 RefreshTreeView();
                 RefreshListView();
                 break;
-            case IDM_FILE_SAVE:
-                OnSaveProject();
-                break;
+                
+            case IDC_BUTTON_OPEN_PROJECT:
             case IDM_FILE_OPEN:
                 OnOpenProject();
                 break;
+                
+            case IDC_BUTTON_SAVE_PROJECT:
+            case IDM_FILE_SAVE:
+                OnSaveProject();
+                break;
+                
+            case IDC_BUTTON_ADD_TASK:
             case IDM_EDIT_ADD_TASK:
-                OnAddTask();
+                {
+                    if (!g_currentProject) return FALSE;
+                    auto newTask = std::make_shared<WBSItem>(L"新しいタスク");
+                    g_currentProject->rootTask->AddChild(newTask);
+                    RefreshTreeView();
+                    MessageBox(hDlg, L"新しいタスクを追加しました。", L"情報", MB_OK | MB_ICONINFORMATION);
+                }
                 break;
+                
+            case IDC_BUTTON_ADD_SUBTASK:
             case IDM_EDIT_ADD_SUBTASK:
-                OnAddSubTask();
+                {
+                    if (!g_selectedItem) {
+                        MessageBox(hDlg, L"親タスクを選択してください。", L"エラー", MB_OK | MB_ICONWARNING);
+                        return FALSE;
+                    }
+                    std::shared_ptr<WBSItem> parentItem = GetItemFromTreeItem(g_selectedItem);
+                    if (!parentItem) return FALSE;
+                    auto newSubTask = std::make_shared<WBSItem>(L"新しいサブタスク");
+                    parentItem->AddChild(newSubTask);
+                    RefreshTreeView();
+                    MessageBox(hDlg, L"新しいサブタスクを追加しました。", L"情報", MB_OK | MB_ICONINFORMATION);
+                }
                 break;
+                
+            case IDC_BUTTON_EDIT_TASK:
             case IDM_EDIT_EDIT_TASK:
-                OnEditTask();
+                {
+                    if (!g_selectedItem) {
+                        MessageBox(hDlg, L"編集するタスクを選択してください。", L"エラー", MB_OK | MB_ICONWARNING);
+                        return FALSE;
+                    }
+                    // タスク編集ダイアログを表示
+                    DialogBox(hInst, MAKEINTRESOURCE(IDD_TASK_EDIT), hDlg, TaskEditDlgProc);
+                }
                 break;
+                
+            case IDC_BUTTON_DELETE_TASK:
             case IDM_EDIT_DELETE_TASK:
-                OnDeleteTask();
+                {
+                    if (!g_selectedItem) {
+                        MessageBox(hDlg, L"削除するタスクを選択してください。", L"エラー", MB_OK | MB_ICONWARNING);
+                        return FALSE;
+                    }
+                    if (MessageBox(hDlg, L"選択したタスクを削除しますか？", L"確認", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                        MessageBox(hDlg, L"タスク削除機能は今後実装予定です。", L"情報", MB_OK | MB_ICONINFORMATION);
+                    }
+                }
                 break;
+                
+            case IDC_BUTTON_EXPAND_ALL:
             case IDM_VIEW_EXPAND_ALL:
                 if (g_hTreeWBS) {
-                    ExpandAllTreeItems(TreeView_GetRoot(g_hTreeWBS));
+                    HTREEITEM hRoot = TreeView_GetRoot(g_hTreeWBS);
+                    if (hRoot) {
+                        // 展開ロジックをここに実装
+                    }
                 }
                 break;
+                
+            case IDC_BUTTON_COLLAPSE_ALL:
             case IDM_VIEW_COLLAPSE_ALL:
                 if (g_hTreeWBS) {
-                    CollapseAllTreeItems(TreeView_GetRoot(g_hTreeWBS));
+                    HTREEITEM hRoot = TreeView_GetRoot(g_hTreeWBS);
+                    if (hRoot) {
+                        // 折り畳みロジックをここに実装
+                    }
                 }
                 break;
+                
+            case IDC_BUTTON_EXIT:
+            case IDM_EXIT:
+                EndDialog(hDlg, IDOK);
+                break;
+                
+            case IDM_ABOUT:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hDlg, About);
+                break;
+                
             default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
+                return (INT_PTR)FALSE;
             }
         }
         break;
+
     case WM_NOTIFY:
         {
             LPNMHDR pnmh = (LPNMHDR)lParam;
@@ -639,48 +353,113 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_SIZE:
-        {
-            int width = LOWORD(lParam);
-            int height = HIWORD(lParam);
-            
-            if (g_hTreeWBS) {
-                SetWindowPos(g_hTreeWBS, nullptr, 0, 0, width / 2, height, SWP_NOZORDER);
-            }
-            if (g_hListDetails) {
-                SetWindowPos(g_hListDetails, nullptr, width / 2, 0, width / 2, height, SWP_NOZORDER);
-            }
-        }
+
+    case WM_CLOSE:
+        EndDialog(hDlg, IDOK);
         break;
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            EndPaint(hWnd, &ps);
-        }
-        break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
+
     default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
+        return (INT_PTR)FALSE;
     }
-    return 0;
+    return (INT_PTR)TRUE;
 }
 
-// バージョン情報ボックスのメッセージ ハンドラーです。
-INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+// ============================================================================
+// タスク編集ダイアログプロシージャ
+// ============================================================================
+
+INT_PTR CALLBACK TaskEditDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    UNREFERENCED_PARAMETER(lParam);
     switch (message)
     {
     case WM_INITDIALOG:
-        return (INT_PTR)TRUE;
+        {
+            // 選択されたタスクの情報をダイアログに設定
+            if (g_selectedItem) {
+                std::shared_ptr<WBSItem> item = GetItemFromTreeItem(g_selectedItem);
+                if (item) {
+                    SetDlgItemText(hDlg, IDC_EDIT_TASK_NAME, item->taskName.c_str());
+                    SetDlgItemText(hDlg, IDC_EDIT_DESCRIPTION, item->description.c_str());
+                    SetDlgItemText(hDlg, IDC_EDIT_ASSIGNED_TO, item->assignedTo.c_str());
+                    
+                    // コンボボックスの初期化 - マクロを使用
+                    HWND hComboStatus = GetDlgItem(hDlg, IDC_COMBO_STATUS);
+                    ComboBox_AddString(hComboStatus, L"未開始");
+                    ComboBox_AddString(hComboStatus, L"進行中");
+                    ComboBox_AddString(hComboStatus, L"完了");
+                    ComboBox_AddString(hComboStatus, L"保留");
+                    ComboBox_AddString(hComboStatus, L"キャンセル");
+                    ComboBox_SetCurSel(hComboStatus, (int)item->status);
+                    
+                    HWND hComboPriority = GetDlgItem(hDlg, IDC_COMBO_PRIORITY);
+                    ComboBox_AddString(hComboPriority, L"低");
+                    ComboBox_AddString(hComboPriority, L"中");
+                    ComboBox_AddString(hComboPriority, L"高");
+                    ComboBox_AddString(hComboPriority, L"緊急");
+                    ComboBox_SetCurSel(hComboPriority, (int)item->priority);
+                    
+                    // 工数の設定
+                    SetDlgItemText(hDlg, IDC_EDIT_ESTIMATED_HOURS, std::to_wstring((int)item->estimatedHours).c_str());
+                    SetDlgItemText(hDlg, IDC_EDIT_ACTUAL_HOURS, std::to_wstring((int)item->actualHours).c_str());
+                    
+                    // 進捗バーの設定
+                    HWND hProgress = GetDlgItem(hDlg, IDC_PROGRESS_BAR);
+                    SendMessage(hProgress, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
+                    SendMessage(hProgress, PBM_SETPOS, (int)item->GetProgressPercentage(), 0);
+                    
+                    std::wstring progressText = std::to_wstring((int)item->GetProgressPercentage()) + L"%";
+                    SetDlgItemText(hDlg, IDC_STATIC_PROGRESS, progressText.c_str());
+                }
+            }
+            return (INT_PTR)TRUE;
+        }
 
     case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDC_BUTTON_APPLY)
         {
-            EndDialog(hDlg, LOWORD(wParam));
+            // フォームからデータを取得してタスクを更新
+            if (g_selectedItem) {
+                std::shared_ptr<WBSItem> item = GetItemFromTreeItem(g_selectedItem);
+                if (item) {
+                    // タスク名の更新
+                    wchar_t buffer[256];
+                    GetDlgItemText(hDlg, IDC_EDIT_TASK_NAME, buffer, 256);
+                    item->taskName = buffer;
+                    
+                    GetDlgItemText(hDlg, IDC_EDIT_DESCRIPTION, buffer, 256);
+                    item->description = buffer;
+                    
+                    GetDlgItemText(hDlg, IDC_EDIT_ASSIGNED_TO, buffer, 256);
+                    item->assignedTo = buffer;
+                    
+                    // ステータスと優先度の更新 - マクロを使用
+                    HWND hComboStatus = GetDlgItem(hDlg, IDC_COMBO_STATUS);
+                    item->status = (TaskStatus)ComboBox_GetCurSel(hComboStatus);
+                    
+                    HWND hComboPriority = GetDlgItem(hDlg, IDC_COMBO_PRIORITY);
+                    item->priority = (TaskPriority)ComboBox_GetCurSel(hComboPriority);
+                    
+                    // 工数の更新
+                    GetDlgItemText(hDlg, IDC_EDIT_ESTIMATED_HOURS, buffer, 256);
+                    item->estimatedHours = _wtof(buffer);
+                    
+                    GetDlgItemText(hDlg, IDC_EDIT_ACTUAL_HOURS, buffer, 256);
+                    item->actualHours = _wtof(buffer);
+                    
+                    // UIを更新
+                    RefreshTreeView();
+                    RefreshListView();
+                }
+            }
+            
+            if (LOWORD(wParam) == IDOK) {
+                EndDialog(hDlg, IDOK);
+            }
+            return (INT_PTR)TRUE;
+        }
+        else if (LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hDlg, IDCANCEL);
             return (INT_PTR)TRUE;
         }
         break;
@@ -688,7 +467,26 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     return (INT_PTR)FALSE;
 }
 
+// ============================================================================
 // 設定ファイル操作用のヘルパー関数
+// ============================================================================
+
+/**
+ * @brief アプリケーション設定ファイルのパスを取得
+ * 
+ * @return 設定ファイルの完全パス
+ * 
+ * ユーザーのAppDataフォルダ内にWBSアプリケーション専用のフォルダを作成し、
+ * 設定ファイルのパスを返します。フォルダが存在しない場合は自動作成されます。
+ * 
+ * @note フォールバック処理:
+ * AppDataフォルダの取得に失敗した場合は、現在のディレクトリに
+ * config.txtファイルを作成します。
+ * 
+ * @details パス構成:
+ * %APPDATA%\WBS_cpp_win32\config.txt
+ * 例: C:\Users\username\AppData\Roaming\WBS_cpp_win32\config.txt
+ */
 std::wstring GetConfigFilePath() {
     wchar_t appDataPath[MAX_PATH];
     if (SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, 0, appDataPath) == S_OK) {
@@ -699,6 +497,21 @@ std::wstring GetConfigFilePath() {
     return L"config.txt"; // フォールバック
 }
 
+/**
+ * @brief 最後に開いたファイルのパスを保存
+ * 
+ * @param filePath 保存するファイルパス
+ * 
+ * ユーザーが最後に開いたプロジェクトファイルのパスを設定ファイルに保存します。
+ * アプリケーション起動時の自動復元機能で使用されます。
+ * 
+ * @details 保存形式:
+ * LastOpenedFile=C:\path\to\project.xml
+ * 
+ * @note エラーハンドリング:
+ * ファイル保存に失敗した場合でも、アプリケーションの動作には影響しません。
+ * 例外はキャッチして無視されます。
+ */
 void SaveLastOpenedFile(const std::wstring& filePath) {
     try {
         std::wstring configFile = GetConfigFilePath();
@@ -712,6 +525,22 @@ void SaveLastOpenedFile(const std::wstring& filePath) {
     }
 }
 
+/**
+ * @brief 最後に開いたファイルのパスを取得
+ * 
+ * @return 最後に開いたファイルパス、見つからない場合は空文字列
+ * 
+ * 設定ファイルから最後に開いたプロジェクトファイルのパスを読み込みます。
+ * アプリケーション起動時の自動復元機能で使用されます。
+ * 
+ * @note エラーハンドリング:
+ * - 設定ファイルが存在しない場合: 空文字列を返す
+ * - ファイル読み込みエラーの場合: 空文字列を返す
+ * - 形式が正しくない場合: 空文字列を返す
+ * 
+ * @details 読み込み処理:
+ * "LastOpenedFile="で始まる行を検索し、その後の部分をパスとして返します。
+ */
 std::wstring GetLastOpenedFile() {
     try {
         std::wstring configFile = GetConfigFilePath();
@@ -731,9 +560,27 @@ std::wstring GetLastOpenedFile() {
     return L"";
 }
 
-// WBS関連の実装
+// ============================================================================
+// その他の関数（既存の実装を使用）
+// ============================================================================
 
-void InitializeWBS(HWND hWnd) {
+void InitializeWBSDialog(HWND hDlg) {
+    // ListViewの初期化
+    if (g_hListDetails) {
+        SendMessage(g_hListDetails, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
+        
+        LVCOLUMN lvc = {};
+        lvc.mask = LVCF_TEXT | LVCF_WIDTH;
+        
+        lvc.pszText = (LPWSTR)L"項目";
+        lvc.cx = 120;
+        ListView_InsertColumn(g_hListDetails, 0, &lvc);
+        
+        lvc.pszText = (LPWSTR)L"値";
+        lvc.cx = 200;
+        ListView_InsertColumn(g_hListDetails, 1, &lvc);
+    }
+    
     // 最後に開いたファイルがあるかチェック
     std::wstring lastFile = GetLastOpenedFile();
     
@@ -794,60 +641,11 @@ void InitializeWBS(HWND hWnd) {
     task3->status = TaskStatus::NOT_STARTED;
     task3->assignedTo = L"鈴木";
     g_currentProject->rootTask->AddChild(task3);
-}
-
-void CreateWBSControls(HWND hWnd) {
-    RECT clientRect;
-    GetClientRect(hWnd, &clientRect);
-    
-    int width = clientRect.right - clientRect.left;
-    int height = clientRect.bottom - clientRect.top;
-
-    // TreeViewを作成
-    g_hTreeWBS = CreateWindowEx(
-        WS_EX_CLIENTEDGE,
-        WC_TREEVIEW,
-        L"",
-        WS_VISIBLE | WS_CHILD | WS_BORDER | TVS_HASLINES | TVS_HASBUTTONS | TVS_LINESATROOT,
-        0, 0, width / 2, height,
-        hWnd,
-        (HMENU)IDC_TREE_WBS,
-        hInst,
-        nullptr
-    );
-
-    // ListViewを作成
-    g_hListDetails = CreateWindowEx(
-        WS_EX_CLIENTEDGE,
-        WC_LISTVIEW,
-        L"",
-        WS_VISIBLE | WS_CHILD | WS_BORDER | LVS_REPORT | LVS_SINGLESEL,
-        width / 2, 0, width / 2, height,
-        hWnd,
-        (HMENU)IDC_LIST_DETAILS,
-        hInst,
-        nullptr
-    );
-
-    // ListViewの拡張スタイルを設定
-    if (g_hListDetails) {
-        SendMessage(g_hListDetails, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
-        
-        LVCOLUMN lvc = {};
-        lvc.mask = LVCF_TEXT | LVCF_WIDTH;
-        
-        lvc.pszText = (LPWSTR)L"項目";
-        lvc.cx = 120;
-        ListView_InsertColumn(g_hListDetails, 0, &lvc);
-        
-        lvc.pszText = (LPWSTR)L"値";
-        lvc.cx = 200;
-        ListView_InsertColumn(g_hListDetails, 1, &lvc);
-    }
 
     RefreshTreeView();
 }
 
+// 既存のRefreshTreeView, RefreshListView等の関数を使用
 void RefreshTreeView() {
     if (!g_hTreeWBS || !g_currentProject) return;
 
@@ -985,71 +783,25 @@ void RefreshListView() {
     ListView_SetItemText(g_hListDetails, 8, 1, const_cast<LPWSTR>(item->assignedTo.c_str()));
 }
 
-void OnAddTask() {
-    if (!g_currentProject) return;
+// バージョン情報ボックスのメッセージ ハンドラーです。
+INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        return (INT_PTR)TRUE;
 
-    auto newTask = std::make_shared<WBSItem>(L"新しいタスク");
-    g_currentProject->rootTask->AddChild(newTask);
-    
-    RefreshTreeView();
-    MessageBox(nullptr, L"新しいタスクを追加しました。", L"情報", MB_OK | MB_ICONINFORMATION);
-}
-
-void OnAddSubTask() {
-    if (!g_selectedItem) {
-        MessageBox(nullptr, L"親タスクを選択してください。", L"エラー", MB_OK | MB_ICONWARNING);
-        return;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+        break;
     }
-
-    std::shared_ptr<WBSItem> parentItem = GetItemFromTreeItem(g_selectedItem);
-    if (!parentItem) return;
-
-    auto newSubTask = std::make_shared<WBSItem>(L"新しいサブタスク");
-    parentItem->AddChild(newSubTask);
-    
-    RefreshTreeView();
-    MessageBox(nullptr, L"新しいサブタスクを追加しました。", L"情報", MB_OK | MB_ICONINFORMATION);
+    return (INT_PTR)FALSE;
 }
 
-void OnEditTask() {
-    MessageBox(nullptr, L"タスク編集機能は今後実装予定です。", L"情報", MB_OK | MB_ICONINFORMATION);
-}
-
-void OnDeleteTask() {
-    if (!g_selectedItem) {
-        MessageBox(nullptr, L"削除するタスクを選択してください。", L"エラー", MB_OK | MB_ICONWARNING);
-        return;
-    }
-
-    if (MessageBox(nullptr, L"選択したタスクを削除しますか？", L"確認", MB_YESNO | MB_ICONQUESTION) == IDYES) {
-        // TODO: 実際の削除処理を実装
-        MessageBox(nullptr, L"タスク削除機能は今後実装予定です。", L"情報", MB_OK | MB_ICONINFORMATION);
-    }
-}
-
-void ExpandAllTreeItems(HTREEITEM hItem) {
-    if (!hItem || !g_hTreeWBS) return;
-    
-    TreeView_Expand(g_hTreeWBS, hItem, TVE_EXPAND);
-    
-    HTREEITEM hChild = TreeView_GetChild(g_hTreeWBS, hItem);
-    while (hChild) {
-        ExpandAllTreeItems(hChild);
-        hChild = TreeView_GetNextSibling(g_hTreeWBS, hChild);
-    }
-}
-
-void CollapseAllTreeItems(HTREEITEM hItem) {
-    if (!hItem || !g_hTreeWBS) return;
-    
-    HTREEITEM hChild = TreeView_GetChild(g_hTreeWBS, hItem);
-    while (hChild) {
-        CollapseAllTreeItems(hChild);
-        hChild = TreeView_GetNextSibling(g_hTreeWBS, hChild);
-    }
-    
-    TreeView_Expand(g_hTreeWBS, hItem, TVE_COLLAPSE);
-}
-
-// WBS_XML_Functions.cppをインクルードしてリンクエラーを解決
+// WBS_XML_Functions.cppをインクルード
 #include "..\WBS_XML_Functions.cpp"

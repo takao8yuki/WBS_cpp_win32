@@ -9,7 +9,7 @@
  * 
  * 【主な役割】
  * - Windows APIの基本ヘッダーファイルのインクルード
- * - Common Controls（TreeView/ListView等）の初期化
+ * - Common Controls（TreeView/ListView/ComboBox等）の初期化
  * - C/C++標準ライブラリの基本ヘッダーインクルード
  * - コンパイル最適化の設定
  * - プロジェクト全体での一貫したインクルード環境の提供
@@ -93,6 +93,7 @@
  * WBSアプリケーションの主要UI要素で使用:
  * - TreeView: 階層的タスク表示用
  * - ListView: タスク詳細情報表示用
+ * - ComboBox: プルダウン選択用
  * - StatusBar: ステータス表示用（将来実装予定）
  * - ToolBar: ツールバー用（将来実装予定）
  * - ProgressBar: 進捗表示用（将来実装予定）
@@ -107,10 +108,25 @@
  * コンパイラにCommon Controlsライブラリ(comctl32.lib)の
  * 自動リンクを指示します。これにより、以下の機能が使用可能になります:
  * - TreeView/ListViewコントロールの作成・操作
+ * - ComboBoxマクロ (ComboBox_AddString, ComboBox_SetCurSel等)
  * - Visual Stylesのサポート
  * - Windows XP以降のモダンな外観
  */
 #pragma comment(lib, "comctl32.lib")
+
+/**
+ * @brief windowsx.h - Windows拡張マクロ
+ * 
+ * Common ControlsのコンビニエンスマクロとWindow操作マクロを提供:
+ * - ComboBox_AddString(): ComboBoxにアイテムを追加
+ * - ComboBox_SetCurSel(): ComboBoxの選択項目を設定
+ * - ComboBox_GetCurSel(): ComboBoxの選択項目を取得
+ * - ListBox_AddString(): ListBoxにアイテムを追加
+ * - Edit_GetText(): エディットコントロールのテキスト取得
+ * 
+ * @note これらのマクロは、SendMessage()の簡潔な代替手段を提供
+ */
+#include <windowsx.h>
 
 // ============================================================================
 // C/C++ 標準ライブラリヘッダーファイル群
@@ -170,3 +186,41 @@
  *       新規コードではstd::wstringの使用を推奨
  */
 #include <tchar.h>
+
+// ============================================================================
+// フレームワーク使用ガイドライン
+// ============================================================================
+
+/*
+ * 【このヘッダーの使用方法】
+ * 
+ * 1. すべての.cppファイルの最初でインクルード:
+ *    #include "framework.h"
+ * 
+ * 2. プロジェクト固有ヘッダーの追加:
+ *    #include "framework.h"
+ *    #include "WBSClasses.h"    // プロジェクト固有クラス
+ *    #include "resource.h"      // リソース定義
+ * 
+ * 3. C++標準ライブラリの追加:
+ *    #include "framework.h"
+ *    #include <vector>          // 必要に応じて追加
+ *    #include <string>
+ *    #include <memory>
+ * 
+ * 【パフォーマンス最適化】
+ * - このファイルはプリコンパイル済みヘッダーとして設定可能
+ * - 頻繁に変更されるヘッダーは分離して配置
+ * - 大きなテンプレートライブラリは必要な場合のみインクルード
+ * 
+ * 【ComboBoxマクロの使用例】
+ * - ComboBox_AddString(hCombo, L"アイテム");
+ * - ComboBox_SetCurSel(hCombo, index);
+ * - int sel = ComboBox_GetCurSel(hCombo);
+ * 
+ * 【将来の拡張予定】
+ * - OLE/COM API (ドラッグ&ドロップ機能用)
+ * - Shell API 拡張 (ファイル関連操作強化)
+ * - Print API (印刷機能実装時)
+ * - Help API (ヘルプシステム実装時)
+ */

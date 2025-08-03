@@ -201,13 +201,33 @@
 #define IDC_RADIO_PROJECT		1027    // プロジェクトモード選択ラジオボタン
 
 // ============================================================================
-// システム定義・Visual Studio連携設定
+// WBSメインダイアログ用リソースID
 // ============================================================================
+#define IDD_WBS_MAIN			180     // WBSメインダイアログ
 
-/**
- * @brief 静的コントロール用の標準ID
- * Windows標準の静的コントロール（ラベル等）で使用
- */
+// ============================================================================
+// WBSメインダイアログ用コントロールID
+// ============================================================================
+#define IDC_BUTTON_EXPAND_ALL	1030    // 全展開ボタン
+#define IDC_BUTTON_COLLAPSE_ALL	1031    // 全折畳ボタン
+#define IDC_BUTTON_ADD_TASK		1032    // タスク追加ボタン
+#define IDC_BUTTON_ADD_SUBTASK	1033    // サブタスク追加ボタン
+#define IDC_BUTTON_EDIT_TASK	1034    // タスク編集ボタン
+#define IDC_BUTTON_DELETE_TASK	1035    // タスク削除ボタン
+#define IDC_BUTTON_NEW_PROJECT	1036    // 新規プロジェクトボタン
+#define IDC_BUTTON_OPEN_PROJECT	1037    // プロジェクト開くボタン
+#define IDC_BUTTON_SAVE_PROJECT	1038    // プロジェクト保存ボタン
+#define IDC_BUTTON_EXIT			1039    // 終了ボタン
+
+// ============================================================================
+// タスク編集ダイアログ用コントロールID
+// ============================================================================
+#define IDC_DATETIME_START		1040    // 開始日DateTimePicker
+#define IDC_DATETIME_END		1041    // 終了日DateTimePicker
+#define IDC_PROGRESS_BAR		1042    // 進捗バー
+#define IDC_STATIC_PROGRESS		1043    // 進捗率表示
+#define IDC_BUTTON_APPLY		1044    // 適用ボタン
+
 #ifndef IDC_STATIC
 #define IDC_STATIC				-1      // 静的コントロールの標準ID（イベント処理不要）
 #endif
@@ -228,7 +248,7 @@
 #define _APS_NO_MFC					130     // MFC不使用の設定
 #define _APS_NEXT_RESOURCE_VALUE	210     // 次に割り当てられるリソースID
 #define _APS_NEXT_COMMAND_VALUE		32771   // 次に割り当てられるコマンドID  
-#define _APS_NEXT_CONTROL_VALUE		1028    // 次に割り当てられるコントロールID（1027の次）
+#define _APS_NEXT_CONTROL_VALUE		1045    // 次に割り当てられるコントロールID
 #define _APS_NEXT_SYMED_VALUE		120     // 次に割り当てられるシンボルID
 
 #endif
