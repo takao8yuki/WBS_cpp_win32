@@ -1,78 +1,268 @@
-﻿//{{NO_DEPENDENCIES}}
+﻿/*
+ * ============================================================================
+ * Resource.h - WBSアプリケーション リソースID定義ヘッダー
+ * ============================================================================
+ * 
+ * このファイルは、WBS（Work Breakdown Structure）管理アプリケーションで使用される
+ * 全てのWindowsリソースの識別子（ID）を一元管理します。
+ * Visual Studio のリソースエディタによって自動生成・更新される部分と、
+ * 手動で追加されたWBS固有のリソースIDが含まれています。
+ * 
+ * 【主な役割】
+ * - メニューコマンドIDの定義
+ * - ダイアログボックスIDの定義  
+ * - UIコントロールIDの定義
+ * - アイコン・文字列リソースIDの定義
+ * - リソースエディタとの連携
+ * 
+ * 【ID命名規則】
+ * - IDM_xxx: メニューコマンド（Menu）
+ * - IDD_xxx: ダイアログボックス（Dialog）
+ * - IDC_xxx: コントロール（Control）
+ * - IDS_xxx: 文字列リソース（String）
+ * - IDI_xxx: アイコンリソース（Icon）
+ * - IDR_xxx: 汎用リソース（Resource）
+ * 
+ * 【ID範囲割り当て】
+ * - 100番台: システム標準・アプリケーション基本
+ * - 110番台: ファイル操作メニュー
+ * - 120番台: 編集操作メニュー  
+ * - 130番台: 表示操作メニュー
+ * - 140番台: 編集拡張機能（元に戻す等）
+ * - 150番台: 印刷関連機能
+ * - 160番台: ヘルプ関連機能
+ * - 200番台: ダイアログボックス
+ * - 1000番台: UIコントロール
+ * 
+ * 【保守上の注意】
+ * - Visual Studio リソースエディタが自動更新する部分の手動編集は避ける
+ * - 新しいIDは適切な範囲に追加し、重複を避ける
+ * - 削除されたIDは再利用せず、新しい番号を使用する
+ * - コメントで用途を明確に記述する
+ * 
+ * 作成者: Visual Studio + WBS開発チーム
+ * 作成日: 2024年
+ * 最終更新: 2024年
+ * バージョン: 1.0
+ * ============================================================================
+ */
+
+//{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ で生成されたインクルード ファイルです。
 // 次で使用: WBS_cpp_win32.rc
 
+// ============================================================================
+// システム標準リソースID （100番台）
+// ============================================================================
+
+/**
+ * @brief アプリケーションタイトル文字列リソースID
+ * LoadString() 関数でアプリケーション名を動的に取得するために使用
+ */
 #define IDS_APP_TITLE			103
 
-#define IDR_MAINFRAME			128
-#define IDD_WBSCPPWIN32_DIALOG	102
-#define IDD_ABOUTBOX			103
-#define IDM_ABOUT				104
-#define IDM_EXIT				105
-#define IDI_WBSCPPWIN32			107
-#define IDI_SMALL				108
-#define IDC_WBSCPPWIN32			109
-#define IDC_MYICON				2
+// Visual Studio自動生成の標準リソースID群
+#define IDR_MAINFRAME			128     // メインフレームリソース
+#define IDD_WBSCPPWIN32_DIALOG	102     // メインダイアログ（未使用）
+#define IDD_ABOUTBOX			103     // バージョン情報ダイアログ
+#define IDM_ABOUT				104     // [ヘルプ] > [バージョン情報] メニュー
+#define IDM_EXIT				105     // [ファイル] > [終了] メニュー
 
-// WBS関連のリソースID
-#define IDM_FILE_NEW			110
-#define IDM_FILE_OPEN			111
-#define IDM_FILE_SAVE			112
-#define IDM_FILE_SAVE_AS		113
-#define IDM_EDIT_ADD_TASK		120
-#define IDM_EDIT_ADD_SUBTASK	121
-#define IDM_EDIT_EDIT_TASK		122
-#define IDM_EDIT_DELETE_TASK	123
-#define IDM_VIEW_EXPAND_ALL		130
-#define IDM_VIEW_COLLAPSE_ALL	131
-#define IDM_EDIT_UNDO			140
-#define IDM_EDIT_REDO			141
-#define IDM_FILE_PRINT			150
-#define IDM_FILE_PRINT_SETUP	151
-#define IDM_HELP_CONTENTS		160
-#define IDM_HELP_INDEX			161
-#define IDM_HELP_SEARCH			162
+/**
+ * @brief アプリケーションアイコンリソースID群
+ * タスクバー、ウィンドウタイトル、Alt+Tabダイアログで表示される
+ */
+#define IDI_WBSCPPWIN32			107     // メインアプリケーションアイコン（大）
+#define IDI_SMALL				108     // 小さいアプリケーションアイコン
 
-// ダイアログID
-#define IDD_TASK_EDIT			200
-#define IDD_ABOUT				201
-#define IDD_PREFERENCES			202
-#define IDD_PRINT_SETTINGS		203
+/**
+ * @brief アプリケーション識別子
+ * ウィンドウクラス名、アクセラレータテーブル等で使用される
+ */
+#define IDC_WBSCPPWIN32			109     // アプリケーションの基本識別子
+#define IDC_MYICON				2       // アイコンリソース識別子
 
-// コントロールID
-#define IDC_TREE_WBS			1000
-#define IDC_LIST_DETAILS		1001
-#define IDC_EDIT_TASK_NAME		1010
-#define IDC_EDIT_DESCRIPTION	1011
-#define IDC_EDIT_START_DATE		1012
-#define IDC_EDIT_END_DATE		1013
-#define IDC_EDIT_ESTIMATED_HOURS 1014
-#define IDC_EDIT_ACTUAL_HOURS	1015
-#define IDC_COMBO_STATUS		1016
-#define IDC_COMBO_PRIORITY		1017
-#define IDC_EDIT_ASSIGNED_TO	1018
-#define IDC_BUTTON_OK			1019
-#define IDC_BUTTON_CANCEL		1020
-#define IDC_STATIC_TEXT			1021
-#define IDC_CHECK_REMINDER		1022
-#define IDC_COMBO_FONT_SIZE	1023
-#define IDC_EDIT_SEARCH			1024
-#define IDC_BUTTON_SEARCH		1025
-#define IDC_RADIO_TASK			1026
-#define IDC_RADIO_PROJECT		1027
+// ============================================================================
+// WBS機能別メニューコマンドID定義
+// ============================================================================
 
+// --- ファイル操作メニュー （110番台）---
+/**
+ * @brief ファイル操作関連のメニューコマンドID
+ * プロジェクトのライフサイクル管理（作成、保存、読み込み）を担当
+ */
+#define IDM_FILE_NEW			110     // [ファイル] > [新規プロジェクト] - 新しいWBSプロジェクトを作成
+#define IDM_FILE_OPEN			111     // [ファイル] > [プロジェクトを開く] - 既存のXMLファイルから読み込み  
+#define IDM_FILE_SAVE			112     // [ファイル] > [プロジェクトを保存] - 現在のプロジェクトをXML形式で保存
+#define IDM_FILE_SAVE_AS		113     // [ファイル] > [名前を付けて保存] - 新しい名前でプロジェクトを保存（将来実装予定）
+
+// --- 編集操作メニュー （120番台）---
+/**
+ * @brief タスク編集関連のメニューコマンドID
+ * WBSタスクの階層構造操作（追加、編集、削除）を担当
+ */
+#define IDM_EDIT_ADD_TASK		120     // [編集] > [タスクを追加] - ルートレベルに新しいタスクを追加
+#define IDM_EDIT_ADD_SUBTASK	121     // [編集] > [サブタスクを追加] - 選択中のタスクに子タスクを追加
+#define IDM_EDIT_EDIT_TASK		122     // [編集] > [タスクを編集] - 選択中のタスクの詳細情報を編集
+#define IDM_EDIT_DELETE_TASK	123     // [編集] > [タスクを削除] - 選択中のタスクとその子タスクを削除
+
+// --- 表示操作メニュー （130番台）---
+/**
+ * @brief ビュー制御関連のメニューコマンドID
+ * TreeViewの表示状態制御を担当
+ */
+#define IDM_VIEW_EXPAND_ALL		130     // [表示] > [すべて展開] - 全ての階層ノードを展開表示
+#define IDM_VIEW_COLLAPSE_ALL	131     // [表示] > [すべて折りたたみ] - 全ての階層ノードを折りたたみ
+
+// --- 編集拡張機能 （140番台）--- ※将来実装予定
+/**
+ * @brief 編集操作の拡張機能メニューID
+ * ユーザビリティ向上のための高度な編集機能（将来実装予定）
+ */
+#define IDM_EDIT_UNDO			140     // [編集] > [元に戻す] - 最後の操作を取り消し
+#define IDM_EDIT_REDO			141     // [編集] > [やり直し] - 取り消した操作を再実行
+
+// --- 印刷関連機能 （150番台）--- ※将来実装予定
+/**
+ * @brief 印刷・レポート出力関連のメニューID
+ * プロジェクト情報の物理的な出力機能（将来実装予定）
+ */
+#define IDM_FILE_PRINT			150     // [ファイル] > [印刷] - WBS構造をプリンタに出力
+#define IDM_FILE_PRINT_SETUP	151     // [ファイル] > [印刷設定] - 印刷オプションの設定ダイアログ
+
+// --- ヘルプ関連機能 （160番台）--- ※将来実装予定
+/**
+ * @brief ヘルプシステム関連のメニューID
+ * ユーザーサポート機能（将来実装予定）
+ */
+#define IDM_HELP_CONTENTS		160     // [ヘルプ] > [ヘルプトピック] - ヘルプファイルを表示
+#define IDM_HELP_INDEX			161     // [ヘルプ] > [キーワード検索] - ヘルプの索引を表示
+#define IDM_HELP_SEARCH			162     // [ヘルプ] > [検索] - ヘルプ内容の全文検索
+
+// ============================================================================
+// ダイアログボックスID定義 （200番台）
+// ============================================================================
+
+/**
+ * @brief ダイアログボックスのリソースID群
+ * 各種設定・編集ダイアログの識別子
+ */
+#define IDD_TASK_EDIT			200     // タスク編集ダイアログ - タスクの詳細情報を編集
+#define IDD_ABOUT				201     // バージョン情報ダイアログ（代替ID）
+#define IDD_PREFERENCES			202     // アプリケーション設定ダイアログ - 表示設定、動作設定等
+#define IDD_PRINT_SETTINGS		203     // 印刷設定ダイアログ - 印刷レイアウト、オプション設定
+
+// ============================================================================
+// UIコントロールID定義 （1000番台）
+// ============================================================================
+
+// --- メインウィンドウコントロール （1000番台前半）---
+/**
+ * @brief メインウィンドウの主要UIコントロールID
+ * アプリケーションのメインインターフェースを構成
+ */
+#define IDC_TREE_WBS			1000    // 左ペイン：WBS階層構造表示用TreeView
+#define IDC_LIST_DETAILS		1001    // 右ペイン：選択タスクの詳細情報表示用ListView
+
+// --- タスク編集ダイアログコントロール （1010番台）---
+/**
+ * @brief タスク編集ダイアログのUIコントロールID群
+ * タスクの詳細情報入力・編集フォームを構成
+ */
+#define IDC_EDIT_TASK_NAME		1010    // タスク名入力欄（単行テキストボックス）
+#define IDC_EDIT_DESCRIPTION	1011    // タスク説明入力欄（複数行テキストボックス）
+#define IDC_EDIT_START_DATE		1012    // 開始日入力欄（日付選択コントロール）
+#define IDC_EDIT_END_DATE		1013    // 終了日入力欄（日付選択コントロール）
+#define IDC_EDIT_ESTIMATED_HOURS 1014   // 見積もり工数入力欄（数値入力ボックス）
+#define IDC_EDIT_ACTUAL_HOURS	1015    // 実績工数入力欄（数値入力ボックス）
+#define IDC_COMBO_STATUS		1016    // タスク状態選択（コンボボックス）
+#define IDC_COMBO_PRIORITY		1017    // 優先度選択（コンボボックス）
+#define IDC_EDIT_ASSIGNED_TO	1018    // 担当者名入力欄（単行テキストボックス）
+
+// --- ダイアログ共通コントロール （1019-1020）---
+/**
+ * @brief ダイアログボックス共通のコントロールID
+ * 標準的なOK/キャンセルボタン
+ */
+#define IDC_BUTTON_OK			1019    // [OK]ボタン - 変更を確定してダイアログを閉じる
+#define IDC_BUTTON_CANCEL		1020    // [キャンセル]ボタン - 変更を破棄してダイアログを閉じる
+
+// --- 追加機能コントロール （1021番台以降）--- ※将来実装予定
+/**
+ * @brief 拡張機能のUIコントロールID群
+ * 将来追加予定の機能用コントロール
+ */
+#define IDC_STATIC_TEXT			1021    // 静的テキスト表示用ラベル
+#define IDC_CHECK_REMINDER		1022    // リマインダー機能有効化チェックボックス
+#define IDC_COMBO_FONT_SIZE		1023    // フォントサイズ選択コンボボックス（設定ダイアログ用）
+#define IDC_EDIT_SEARCH			1024    // 検索キーワード入力欄
+#define IDC_BUTTON_SEARCH		1025    // [検索実行]ボタン
+#define IDC_RADIO_TASK			1026    // タスクモード選択ラジオボタン
+#define IDC_RADIO_PROJECT		1027    // プロジェクトモード選択ラジオボタン
+
+// ============================================================================
+// システム定義・Visual Studio連携設定
+// ============================================================================
+
+/**
+ * @brief 静的コントロール用の標準ID
+ * Windows標準の静的コントロール（ラベル等）で使用
+ */
 #ifndef IDC_STATIC
-#define IDC_STATIC				-1
+#define IDC_STATIC				-1      // 静的コントロールの標準ID（イベント処理不要）
 #endif
-// 新しいオブジェクトの次の既定値
-//
-#ifdef APSTUDIO_INVOKED
+
+// ============================================================================
+// Visual Studio リソースエディタ自動生成部分
+// ============================================================================
+// 【重要】以下の部分はVisual Studioのリソースエディタが自動管理します
+// 手動での編集は避け、リソースエディタ経由で変更してください
+
+/**
+ * @brief 新しいリソースの既定値設定
+ * Visual Studio リソースエディタが新しいリソース追加時に使用する設定
+ */
+#ifdef APSTUDIO_INVOKED    // リソースエディタ専用のセクション
 #ifndef APSTUDIO_READONLY_SYMBOLS
 
-#define _APS_NO_MFC					130
-#define _APS_NEXT_RESOURCE_VALUE	210
-#define _APS_NEXT_COMMAND_VALUE		32771
-#define _APS_NEXT_CONTROL_VALUE		1021
-#define _APS_NEXT_SYMED_VALUE		120
+#define _APS_NO_MFC					130     // MFC不使用の設定
+#define _APS_NEXT_RESOURCE_VALUE	210     // 次に割り当てられるリソースID
+#define _APS_NEXT_COMMAND_VALUE		32771   // 次に割り当てられるコマンドID  
+#define _APS_NEXT_CONTROL_VALUE		1028    // 次に割り当てられるコントロールID（1027の次）
+#define _APS_NEXT_SYMED_VALUE		120     // 次に割り当てられるシンボルID
+
 #endif
 #endif
+
+// ============================================================================
+// ID管理ガイドライン
+// ============================================================================
+
+/*
+ * 【新しいID追加時の注意事項】
+ * 
+ * 1. 適切な範囲に追加:
+ *    - メニュー: 110-169番台（機能別）
+ *    - ダイアログ: 200-299番台
+ *    - コントロール: 1000-1999番台
+ * 
+ * 2. ID命名規則の遵守:
+ *    - 機能を表す明確な名前を使用
+ *    - 略語は一般的なもののみ使用
+ *    - アンダースコアで単語を区切る
+ * 
+ * 3. コメントの追加:
+ *    - 用途と動作を明確に記述
+ *    - 将来実装予定の場合は明記
+ *    - 関連する他のIDとの関係を記述
+ * 
+ * 4. 削除時の対応:
+ *    - 削除されたIDは再利用禁止
+ *    - コメントアウトして履歴を残す
+ *    - 代替IDがある場合は併記
+ * 
+ * 【パフォーマンス考慮事項】
+ * - IDの範囲を適切に分散させることで、switch文での分岐効率が向上
+ * - 頻繁に使用されるIDは小さい値を割り当てる
+ * - 連続した値を使用することでコンパイラ最適化が効果的
+ */
